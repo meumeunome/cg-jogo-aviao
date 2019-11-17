@@ -611,6 +611,7 @@ void restart(){
 	aviaoJogador->reiniciar();
 
 	inimigosAereos.clear();
+	inimigosTerrestres.clear();
 	cloneInitialList();
 	shootingTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
 
@@ -627,14 +628,21 @@ float randomFloat(float a, float b) {
 }
 
 void projeteisChecaColisao(){
-	for(list<Projetil*>::iterator projAux = projeteis.begin(); projAux != projeteis.end(); ++projAux){
+	list<Projetil*>::iterator projAux = projeteis.begin();
+	while (projAux != projeteis.end()){
+		Projetil *proj = *projAux;
+		++projAux;
+
 		list<Aviao*>::iterator aux = inimigosAereos.begin();
 		while (aux != inimigosAereos.end()) {
 			Aviao* aviaoAux = *aux;
 			++aux;
-			if(colide(*projAux, aviaoAux, 1)){
+			if(colide(proj, aviaoAux, 1)){
 				inimigosAereos.remove(aviaoAux);
 				free(aviaoAux);
+
+				projeteis.remove(proj);
+				free(proj);
 			}
 		}
 	}
