@@ -8,6 +8,8 @@
 #include "linha.h"
 #include "aviao.h"
 
+void *fonte = GLUT_BITMAP_TIMES_ROMAN_24;
+
 //Cores padrões
 GLfloat red[] = {1.0, 0.0, 0.0};
 GLfloat green[] = {0.0, 1.0, 0.0};
@@ -46,8 +48,12 @@ GLfloat enemyTiroSpeed;
 GLfloat decolagemOldTime_Fixer;
 GLfloat flyingOldTime_Fixer;
 GLfloat shootingTime;
+GLfloat turnTime;
+int numTerrestres;
+int destruidos = 0;
 bool decolando = false;
 int oldMouseX = -1;
+bool win = false;
 
 //Flags dos botoes
 int flags[256];
@@ -67,6 +73,10 @@ bool colide(Bolinha* aviao, Bolinha *c, int flag);
 float randomFloat(float a, float b);
 void cloneInitialList();
 void projeteisChecaColisao();
+void projeteisInimigosChecaColisao();
+void exibeGameOver(GLfloat x, GLfloat y);
+void exibeVitoria(GLfloat x, GLfloat y);
+void exibePontuacao(GLfloat x, GLfloat y);
 
 void keyPress(unsigned char key, int x, int y) {
 	flags[key] = 1;
@@ -142,6 +152,14 @@ void display(){
     (*aux)->desenha();
   }
 
+	if(aviaoJogador->isDead())
+		exibeGameOver(bolinhaArena->getX() - bolinhaArena->getRaio()/2, bolinhaArena->getY());
+
+	if(win)
+		exibeVitoria(bolinhaArena->getX() - bolinhaArena->getRaio()/2, bolinhaArena->getY());
+
+	exibePontuacao(bolinhaArena->getX(), bolinhaArena->getY()-bolinhaArena->getRaio());
+
   glutSwapBuffers();
 }
 
@@ -154,7 +172,7 @@ void idle(){
 		restart();
 		return;
 	}
-	if(aviaoJogador->isDead())
+	if(aviaoJogador->isDead() || win)
 		return;
 
 	//------------ Andar ----------------------
@@ -165,9 +183,14 @@ void idle(){
 
 	/*Anda com os avioes inimigos*/
 	bool willShoot = false;
+	bool willTurn = false;
 	if( currentTime - shootingTime >= 1/enemyTiroFreq ){
 		willShoot = true;
 		shootingTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+	}
+	if(currentTime - turnTime >= 2){
+		willTurn = true;
+		turnTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
 	}
 	for(list<Aviao*>::iterator aux = inimigosAereos.begin(); aux != inimigosAereos.end(); ++aux){
 		(*aux)->andar(enemyMovSpeed);
@@ -176,15 +199,32 @@ void idle(){
 			projeteisInimigos.push_front((*aux)->atirar(enemyTiroSpeed));
 		}
 
+		if(willTurn){
+			(*aux)->setTurning(randomFloat(-M_PI/2, M_PI/2));
+		}
+
+		if( (*aux)->getTurning() < 0 ){
+			if( (*aux)->getAngulo() > (*aux)->getInitAngulo() + (*aux)->getTurning() )
+				(*aux)->incrementAngulo(-angSpeed);
+			else
+				(*aux)->setTurning(0.0);
+		}
+		if( (*aux)->getTurning() > 0 ){
+			if( (*aux)->getAngulo() < (*aux)->getInitAngulo() + (*aux)->getTurning() )
+				(*aux)->incrementAngulo(angSpeed);
+			else
+				(*aux)->setTurning(0.0);
+		}
+
 		if(colide(*aux, bolinhaArena, 2)){
 			(*aux)->andar(-enemyMovSpeed);
 			teleportar(*aux);
 		}
 	}
+	/*------Anda com os avioes inimigos------*/
 	deslocarProjeteisInimigos(enemyMovSpeed);
 
 	if(aviaoJogador->isVoando()){
-
 		if(flags['a'] == 1)
 			aviaoJogador->incrementAngulo(-angSpeed);
 		if(flags['d'] == 1)
@@ -197,10 +237,13 @@ void idle(){
 		deslocarProjeteis(playerMovSpeed);
 
 		deslocarBombas(playerMovSpeed);
+		if(inimigosTerrestres.empty())
+			win = true;
 
 		aviaoJogador->andar(playerMovSpeed);
 
 		projeteisChecaColisao();
+		projeteisInimigosChecaColisao();
 
 		switch(haveColision()){
 			case 1:
@@ -260,6 +303,7 @@ int main(int argc, char** argv){
   	glutCreateWindow ("Arena");
 
 		shootingTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+		turnTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
 
   	init(0.0, 0.0, 0.0);
   	glutDisplayFunc(display);
@@ -389,6 +433,7 @@ void readArena(){
   }
 
 	cloneInitialList();
+	numTerrestres = inimigosTerrestres.size();
 }
 
 GLfloat* getColor(std::string cor){
@@ -412,7 +457,7 @@ GLfloat* getColor(std::string cor){
   exit(1);
 }
 
-/* Para colisao com inimigoAereo -> 1
+/* Para colisao com aviao -> 1
  * Para colisao com a arena -> 2 */
 bool colide(Bolinha* aviao, Bolinha *c, int flag){
   float dist = sqrt(pow((c->getX() - aviao->getX()), 2) + pow((c->getY() - aviao->getY()), 2));
@@ -471,6 +516,19 @@ bool bombaForaDaArena(Bomba* bomba){
 	return (bolinhaArena->getRaio() < dist);
 }
 
+void checaColisaoBomba(Bomba* bomba){
+	list<Bolinha*>::iterator aux = inimigosTerrestres.begin();
+	while (aux != inimigosTerrestres.end()) {
+		Bolinha* bolinhaAux = *aux;
+		++aux;
+		if(colide(bomba, bolinhaAux, 1)){
+			inimigosTerrestres.remove(bolinhaAux);
+			free(bolinhaAux);
+			destruidos++;
+		}
+	}
+}
+
 void deslocarBombas(GLfloat movSpeed){
 	list<Bomba*>::iterator aux = bombas.begin();
 	while (aux != bombas.end()) {
@@ -482,6 +540,7 @@ void deslocarBombas(GLfloat movSpeed){
 			bombas.remove(bombAux);
 			free(bombAux);
 		} else if( bombAux->getRaio() <= bombAux->getRaioInit()/2 ){
+			checaColisaoBomba(bombAux);
 			bombas.remove(bombAux);
 			free(bombAux);
 		}
@@ -556,6 +615,8 @@ void restart(){
 	shootingTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
 
 	decolando = false;
+	win = false;
+	destruidos = 0;
 }
 
 float randomFloat(float a, float b) {
@@ -577,4 +638,66 @@ void projeteisChecaColisao(){
 			}
 		}
 	}
+}
+
+void projeteisInimigosChecaColisao(){
+	for(list<Projetil*>::iterator projAux = projeteisInimigos.begin(); projAux != projeteisInimigos.end(); ++projAux){
+		if(colide(*projAux, aviaoJogador, 1))
+			aviaoJogador->setDead(true);
+	}
+}
+
+void exibeGameOver(GLfloat x, GLfloat y){
+	char *strTemporaria;
+	char gameOver[80];
+	glColor3f(1.0,1.0,1.0);
+    sprintf(gameOver, "GAME OVER!");
+    glRasterPos2f(x, y);
+    strTemporaria = gameOver;
+    while( *strTemporaria ){
+        glutBitmapCharacter(fonte, *strTemporaria);
+        strTemporaria++;
+    }
+	glColor3f(1.0,1.0,1.0);
+	sprintf(gameOver, "Pressione R para jogar novamente!");
+	glRasterPos2f(x, y + 25);
+	strTemporaria = gameOver;
+	while( *strTemporaria ){
+		glutBitmapCharacter(fonte, *strTemporaria);
+		strTemporaria++;
+	}
+}
+
+void exibeVitoria(GLfloat x, GLfloat y){
+	char *strTemporaria;
+	char gameOver[80];
+	glColor3f(1.0,1.0,1.0);
+    sprintf(gameOver, "VOCE VENCEU!");
+    glRasterPos2f(x, y);
+    strTemporaria = gameOver;
+    while( *strTemporaria ){
+        glutBitmapCharacter(fonte, *strTemporaria);
+        strTemporaria++;
+    }
+	glColor3f(1.0,1.0,1.0);
+	sprintf(gameOver, "Pressione R para jogar novamente!");
+	glRasterPos2f(x, y + 25);
+	strTemporaria = gameOver;
+	while( *strTemporaria ){
+		glutBitmapCharacter(fonte, *strTemporaria);
+		strTemporaria++;
+	}
+}
+
+void exibePontuacao(GLfloat x, GLfloat y){
+	char *strTemporaria;
+	char pontuacao[50];
+	glColor3f(1.0,1.0,1.0);
+    sprintf(pontuacao, "%d de %d bases destruidas.", destruidos, numTerrestres);
+    glRasterPos2f(x+50, y+25);
+    strTemporaria = pontuacao;
+    while( *strTemporaria ){
+        glutBitmapCharacter(fonte, *strTemporaria);
+        strTemporaria++;
+    }
 }

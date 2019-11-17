@@ -12,6 +12,7 @@ Aviao::Aviao(GLfloat& raio, GLfloat& x, GLfloat& y, GLfloat& r, GLfloat& g, GLfl
     this->anguloHelice = 0;
     this->anguloCanhao = 0;
     this->dead = false;
+    this->turning = 0.0;
 }
 
 void Aviao::incrementX(GLfloat x){
@@ -25,8 +26,15 @@ void Aviao::incrementY(GLfloat y){
 void Aviao::setDead(bool state){
   this->dead = state;
 }
-GLfloat Aviao::isDead(){
+bool Aviao::isDead(){
   return this->dead;
+}
+
+void Aviao::setTurning(GLfloat state){
+  this->turning = state;
+}
+GLfloat Aviao::getTurning(){
+  return this->turning;
 }
 
 GLfloat Aviao::getAngulo(){
@@ -40,6 +48,13 @@ void Aviao::setAngulo(GLfloat& angulo){
 }
 void Aviao::incrementAngulo(GLfloat angulo){
   this->angulo += angulo;
+}
+
+GLfloat Aviao::getInitAngulo(){
+  return this->initAngulo;
+}
+void Aviao::setInitAngulo(GLfloat& angulo){
+  this->angulo = initAngulo;
 }
 
 bool Aviao::isVoando(){

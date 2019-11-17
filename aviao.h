@@ -16,6 +16,7 @@ class Aviao : public Bolinha
         GLfloat initAngulo;
         bool dead;
         bool voando;
+        GLfloat turning;
         GLfloat initX;
         GLfloat initY;
         GLfloat initRaio;
@@ -40,13 +41,17 @@ class Aviao : public Bolinha
         void incrementX(GLfloat x);
         void incrementY(GLfloat y);
         void setDead(bool state);
-        GLfloat isDead();
+        bool isDead();
         GLfloat getAngulo();
         GLfloat getAnguloEmGrau();
         void setAngulo(GLfloat& angulo);
         void incrementAngulo(GLfloat angulo);
+        GLfloat getInitAngulo();
+        void setInitAngulo(GLfloat& angulo);
         bool isVoando();
         void setVoando(bool flag);
+        GLfloat getTurning();
+        void setTurning(GLfloat flag);
         void setInitX(GLfloat x);
         GLfloat getInitX();
         void setInitY(GLfloat y);
