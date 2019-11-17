@@ -26,9 +26,12 @@ Linha* linhaDecolagem;
 //Lista de inimigos
 list<Aviao*> inimigosAereos;
 list<Bolinha*> inimigosTerrestres;
+list<Aviao*> inimigosAereosInicial;
+list<Bolinha*> inimigosTerrestresInicial;
 
 //Lista de projeteis
 list<Projetil*> projeteis;
+list<Projetil*> projeteisInimigos;
 
 //Lista de bombas
 list<Bomba*> bombas;
@@ -36,8 +39,13 @@ list<Bomba*> bombas;
 //Variaveis auxiliares
 std::string pathToArena = "";
 GLfloat playerSpeed;
+GLfloat playerTiroSpeed;
+GLfloat enemySpeed;
+GLfloat enemyTiroFreq;
+GLfloat enemyTiroSpeed;
 GLfloat decolagemOldTime_Fixer;
 GLfloat flyingOldTime_Fixer;
+GLfloat shootingTime;
 bool decolando = false;
 int oldMouseX = -1;
 
@@ -51,11 +59,14 @@ GLfloat* getColor(std::string cor);
 int haveColision();
 bool projetilForaDaArena(Projetil* projetil);
 void deslocarProjeteis(GLfloat movSpeed);
+void deslocarProjeteisInimigos(GLfloat movSpeed);
 void deslocarBombas(GLfloat movSpeed);
 void teleportar(Aviao* aviao);
 void restart();
-bool colide(Aviao* aviao, Bolinha *c, int flag);
+bool colide(Bolinha* aviao, Bolinha *c, int flag);
 float randomFloat(float a, float b);
+void cloneInitialList();
+void projeteisChecaColisao();
 
 void keyPress(unsigned char key, int x, int y) {
 	flags[key] = 1;
@@ -86,7 +97,7 @@ void mouse(int button, int state, int x, int y){
 		return;
 	switch( button ){
 		case 0:
-			projeteis.push_front(aviaoJogador->atirar());
+			projeteis.push_front(aviaoJogador->atirar(playerTiroSpeed));
 			break;
 		case 2:
 			bombas.push_front(aviaoJogador->bombardear());
@@ -112,6 +123,9 @@ void display(){
 
 	/* Desenha os projeteis em jogo */
 	for(list<Projetil*>::iterator aux = projeteis.begin(); aux != projeteis.end(); ++aux){
+    (*aux)->desenha();
+  }
+	for(list<Projetil*>::iterator aux = projeteisInimigos.begin(); aux != projeteisInimigos.end(); ++aux){
     (*aux)->desenha();
   }
 
@@ -144,18 +158,31 @@ void idle(){
 		return;
 
 	//------------ Andar ----------------------
-	GLfloat movSpeed = playerSpeed * difference;
+	GLfloat playerMovSpeed = playerSpeed * difference;
+	GLfloat enemyMovSpeed = enemySpeed * difference;
 	GLfloat angSpeed = (90 * M_PI)/180 * difference;
 	GLfloat accel = 100 * difference;
 
 	/*Anda com os avioes inimigos*/
+	bool willShoot = false;
+	if( currentTime - shootingTime >= 1/enemyTiroFreq ){
+		willShoot = true;
+		shootingTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+	}
 	for(list<Aviao*>::iterator aux = inimigosAereos.begin(); aux != inimigosAereos.end(); ++aux){
-		(*aux)->andar(movSpeed);
+		(*aux)->andar(enemyMovSpeed);
+
+		if(willShoot){
+			projeteisInimigos.push_front((*aux)->atirar(enemyTiroSpeed));
+		}
+
 		if(colide(*aux, bolinhaArena, 2)){
-			(*aux)->andar(-movSpeed);
+			(*aux)->andar(-enemyMovSpeed);
 			teleportar(*aux);
 		}
 	}
+	deslocarProjeteisInimigos(enemyMovSpeed);
+
 	if(aviaoJogador->isVoando()){
 
 		if(flags['a'] == 1)
@@ -167,18 +194,20 @@ void idle(){
 		if(flags['-'] == 1)
 			aviaoJogador->incrementSpeed(-accel);
 
-		deslocarProjeteis(movSpeed);
+		deslocarProjeteis(playerMovSpeed);
 
-		deslocarBombas(movSpeed);
+		deslocarBombas(playerMovSpeed);
 
-		aviaoJogador->andar(movSpeed);
+		aviaoJogador->andar(playerMovSpeed);
+
+		projeteisChecaColisao();
 
 		switch(haveColision()){
 			case 1:
 				aviaoJogador->setDead(true);
 				break;
 			case 2:
-				aviaoJogador->andar(-movSpeed);
+				aviaoJogador->andar(-playerMovSpeed);
 				teleportar(aviaoJogador);
 		}
 
@@ -230,6 +259,8 @@ int main(int argc, char** argv){
   	glutInitWindowPosition (50, 50);
   	glutCreateWindow ("Arena");
 
+		shootingTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+
   	init(0.0, 0.0, 0.0);
   	glutDisplayFunc(display);
     glutKeyboardFunc(keyPress);
@@ -262,19 +293,28 @@ void readConfig(char *path){
   TiXmlElement *nomeArena = NULL;
   TiXmlElement *tipoArena = NULL;
   TiXmlElement *caminhoArena = NULL;
+	TiXmlElement *inimigo = NULL;
 
   //----- Resgata valores-----------------------------------
   //Captura do arquivo xml
   arquivoDaArena = aplicacao->FirstChildElement( "arquivoDaArena" );
   jogador = aplicacao->FirstChildElement( "jogador" );
+	inimigo = aplicacao->FirstChildElement( "inimigo" );
 
   //Valores para se obter a arena
   nomeArena = arquivoDaArena->FirstChildElement( "nome" );
   tipoArena = arquivoDaArena->FirstChildElement( "tipo" );
   caminhoArena = arquivoDaArena->FirstChildElement( "caminho" );
 
-  //Valor da velocidade final do jogador
+  //Valores do jogador
   playerSpeed = atof(jogador->Attribute( "vel" ));
+	playerTiroSpeed = atof(jogador->Attribute( "velTiro" ));
+
+	//Valores dos inimigos
+	enemySpeed = atof(inimigo->Attribute( "vel" ));
+	enemyTiroFreq = atof(inimigo->Attribute( "freqTiro" ));
+	enemyTiroSpeed = atof(inimigo->Attribute( "velTiro" ));
+
   //----- /Resgata valores----------------------------------
 
   if(caminhoArena->GetText() != NULL)
@@ -336,18 +376,19 @@ void readArena(){
       bolinhaArena = bolinha;
     }else {
      	if(cores == red){
-       	inimigosAereos.push_back(inimigo);
+				inimigosAereosInicial.push_back(inimigo);
      	}else if(cores == orange){
-       	inimigosTerrestres.push_back(bolinha);
+				inimigosTerrestresInicial.push_back(bolinha);
      	}
   	}
 
   }//EndFor
 
-	for(list<Aviao*>::iterator aux = inimigosAereos.begin(); aux != inimigosAereos.end(); ++aux){
+	for(list<Aviao*>::iterator aux = inimigosAereosInicial.begin(); aux != inimigosAereosInicial.end(); ++aux){
     (*aux)->initializeSpeed(linhaDecolagem);
   }
 
+	cloneInitialList();
 }
 
 GLfloat* getColor(std::string cor){
@@ -373,7 +414,7 @@ GLfloat* getColor(std::string cor){
 
 /* Para colisao com inimigoAereo -> 1
  * Para colisao com a arena -> 2 */
-bool colide(Aviao* aviao, Bolinha *c, int flag){
+bool colide(Bolinha* aviao, Bolinha *c, int flag){
   float dist = sqrt(pow((c->getX() - aviao->getX()), 2) + pow((c->getY() - aviao->getY()), 2));
   if(flag == 1)
     return (c->getRaio()+aviao->getRaio() > dist);
@@ -406,6 +447,20 @@ void deslocarProjeteis(GLfloat movSpeed){
 		projAux->andar(movSpeed);
 		if( projetilForaDaArena(projAux) ){
 			projeteis.remove(projAux);
+			free(projAux);
+		}
+	}
+}
+
+void deslocarProjeteisInimigos(GLfloat movSpeed){
+	list<Projetil*>::iterator aux = projeteisInimigos.begin();
+	while (aux != projeteisInimigos.end()) {
+		Projetil* projAux = *aux;
+		++aux;
+
+		projAux->andar(movSpeed);
+		if( projetilForaDaArena(projAux) ){
+			projeteisInimigos.remove(projAux);
 			free(projAux);
 		}
 	}
@@ -449,23 +504,45 @@ void teleportar(Aviao* aviao){
 }
 
 void limparProjeteis(){
-	list<Projetil*>::iterator aux = projeteis.begin();
-	while (aux != projeteis.end()) {
-		Projetil* projAux = *aux;
-		++aux;
-		projeteis.remove(projAux);
-		free(projAux);
-	}
+	projeteis.clear();
+	projeteisInimigos.clear();
 }
 
 void limparBombas(){
-	list<Bomba*>::iterator aux = bombas.begin();
-	while (aux != bombas.end()) {
-		Bomba* bombAux = *aux;
-		++aux;
-		bombas.remove(bombAux);
-		free(bombAux);
-	}
+	bombas.clear();
+}
+
+void cloneInitialList(){
+	for(list<Aviao*>::iterator aux = inimigosAereosInicial.begin(); aux != inimigosAereosInicial.end(); ++aux){
+		GLfloat angulo = randomFloat(0, 2*M_PI);
+		GLfloat raio = (*aux)->getRaio();
+		GLfloat x = (*aux)->getX();
+		GLfloat y = (*aux)->getY();
+		GLfloat r = (*aux)->getR();
+		GLfloat g = (*aux)->getG();
+		GLfloat b = (*aux)->getB();
+		GLint id = (*aux)->getId();
+		GLfloat speed = (*aux)->getSpeed();
+
+		Aviao *inimigo = new Aviao(raio, x, y, r, g, b, id, angulo);
+		inimigo->setSpeed(speed);
+
+		inimigosAereos.push_front(inimigo);
+  }
+
+	for(list<Bolinha*>::iterator aux = inimigosTerrestresInicial.begin(); aux != inimigosTerrestresInicial.end(); ++aux){
+		GLfloat raio = (*aux)->getRaio();
+		GLfloat x = (*aux)->getX();
+		GLfloat y = (*aux)->getY();
+		GLfloat r = (*aux)->getR();
+		GLfloat g = (*aux)->getG();
+		GLfloat b = (*aux)->getB();
+		GLint id = (*aux)->getId();
+
+		Bolinha *inimigo = new Bolinha(raio, x, y, r, g, b, id);
+
+		inimigosTerrestres.push_front(inimigo);
+  }
 }
 
 void restart(){
@@ -473,10 +550,11 @@ void restart(){
 	limparBombas();
 
 	aviaoJogador->reiniciar();
-	for(list<Aviao*>::iterator aux = inimigosAereos.begin(); aux != inimigosAereos.end(); ++aux){
-    (*aux)->reiniciar();
-		(*aux)->initializeSpeed(linhaDecolagem);
-  }
+
+	inimigosAereos.clear();
+	cloneInitialList();
+	shootingTime = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+
 	decolando = false;
 }
 
@@ -485,4 +563,18 @@ float randomFloat(float a, float b) {
     float diff = b - a;
     float r = random * diff;
     return a + r;
+}
+
+void projeteisChecaColisao(){
+	for(list<Projetil*>::iterator projAux = projeteis.begin(); projAux != projeteis.end(); ++projAux){
+		list<Aviao*>::iterator aux = inimigosAereos.begin();
+		while (aux != inimigosAereos.end()) {
+			Aviao* aviaoAux = *aux;
+			++aux;
+			if(colide(*projAux, aviaoAux, 1)){
+				inimigosAereos.remove(aviaoAux);
+				free(aviaoAux);
+			}
+		}
+	}
 }

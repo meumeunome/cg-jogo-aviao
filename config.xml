@@ -4,5 +4,6 @@
 		<tipo>svg</tipo>
 		<caminho></caminho>
 	</arquivoDaArena>
-	<jogador vel="1.0"></jogador>
+	<jogador velTiro="2.0" vel="1.0"></jogador>
+	<inimigo freqTiro="0.2" vel="2.0" velTiro="1.0"></inimigo>
 </aplicacao>

@@ -66,7 +66,7 @@ class Aviao : public Bolinha
         GLfloat getAnguloCanhaoEmGrau();
         void setAnguloCanhao(GLfloat angulo);
         void incrementAnguloCanhao(GLfloat angulo);
-        Projetil* atirar();
+        Projetil* atirar(GLfloat tiroSpeed);
         Bomba* bombardear();
         void reiniciar();
         void initializeSpeed(Linha* linha);

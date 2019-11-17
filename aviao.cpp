@@ -188,7 +188,7 @@ void Aviao::andar(GLfloat movSpeed){
   incrementY(movSpeed_y);
 }
 
-Projetil* Aviao::atirar(){
+Projetil* Aviao::atirar(GLfloat tiroSpeed){
   GLfloat raio = this->getRaio();
   GLfloat raioProjetil = raio/6;
   GLfloat angulo = this->getAngulo() + this->getAnguloCanhao();
@@ -198,7 +198,7 @@ Projetil* Aviao::atirar(){
   GLfloat g = 0.8;
   GLfloat b = 0.8;
   GLint id = this->getId();
-  GLfloat speed = this->getSpeed()*2;
+  GLfloat speed = this->getSpeed()*2*tiroSpeed;
 
   Projetil* projetil = new Projetil(raioProjetil, x_canhao, y_canhao, r, g, b, id, speed, angulo);
 
