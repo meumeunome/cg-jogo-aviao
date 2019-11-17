@@ -130,6 +130,18 @@ void Aviao::reiniciar(){
   this->anguloHelice = 0.0;
 }
 
+void Aviao::initializeSpeed(Linha* linha){
+  GLfloat totalTime = 4.0;
+
+  GLfloat dx = linha->getX2() - linha->getX1();
+  GLfloat dy = linha->getY2() - linha->getY1();
+
+  GLfloat accelX = 2*dx / pow(totalTime,2);
+  GLfloat accelY = 2*dy / pow(totalTime,2);
+
+  this->setSpeed(sqrt(pow(accelX, 2) + pow(accelY, 2)) * totalTime);
+}
+
 void Aviao::decolar(Linha* linha, GLint& currentTime){
   GLfloat totalTime = 4.0;
 

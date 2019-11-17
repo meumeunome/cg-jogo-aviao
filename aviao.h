@@ -69,6 +69,7 @@ class Aviao : public Bolinha
         Projetil* atirar();
         Bomba* bombardear();
         void reiniciar();
+        void initializeSpeed(Linha* linha);
 
         // ------------ Desenho ------------ //
         void desenha();
